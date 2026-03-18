@@ -6,7 +6,7 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@herou
 import { Input } from "@heroui/input";
 import { Checkbox } from "@heroui/checkbox";
 import { Select, SelectItem } from "@heroui/select";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createHttpClient, useGriddb, getContainer, getContainerInfo, postContainer, deleteContainer } from "@/hooks/useGriddbAccess";
 import { AuthInfo, Containers, Container, Column, typeName } from "../types";
 import { IconRefresh, IconTablePlus, IconTrash } from '@tabler/icons-react';
@@ -17,15 +17,11 @@ type PanelProps = {
     auth: AuthInfo;
 };
 
-type Props = {
-    auth: AuthInfo;
-    onCreated: () => void; // コンテナ作成後に一覧を再取得するため
-};
 
 
 export const Panel = ({ auth }: PanelProps) => {
     const rightPaneRef = useRef<RightPaneHandle>(null);
-    const client = createHttpClient(auth);
+    const client = useMemo(() => createHttpClient(auth), [auth]);
 
     // コンテナ一覧取得
     const { data: containers, loading, error, execute } = useGriddb<Containers>(
@@ -55,7 +51,7 @@ export const Panel = ({ auth }: PanelProps) => {
                 console.log("詳細情報取得完了:", detailsMap);
             });
         }
-    }, [containers.names]);
+    }, [containers.names, client]);
 
     const handleReload = async () => {
         const response = await execute(() => getContainer(client));
@@ -82,6 +78,7 @@ export const Panel = ({ auth }: PanelProps) => {
         const response = await execute(() => deleteContainer(client, data));
         if (response && response.status === 204) {
             console.log("削除成功:", response.data);
+            rightPaneRef.current?.closeContainerTab(selectedContainer);
             await handleReload();
         } else {
             console.error("削除失敗:", response?.status);
@@ -133,8 +130,8 @@ export const Panel = ({ auth }: PanelProps) => {
             } else {
                 setErrorAdd(`作成失敗: ${response.status}`);
             }
-        } catch (err: any) {
-            setErrorAdd(err.message || "API Error");
+        } catch (err) {
+            setErrorAdd(err instanceof Error ? err.message : "API Error");
         } finally {
             setLoadingAdd(false);
         }
@@ -142,38 +139,53 @@ export const Panel = ({ auth }: PanelProps) => {
     return (
         <>
             <Divider />
-            <Button onPress={handleReload} color="default"><IconRefresh
-                size={18} // set custom `width` and `height`
-                color="black" // set `stroke` color
-                stroke={2}  // set `stroke-width`
-                strokeLinejoin="miter" // override other SVG props
-            /></Button>
-            <Button onPress={() => setIsOpen(true)} color="default"><IconTablePlus
-                size={18} // set custom `width` and `height`
-                color="black" // set `stroke` color
-                stroke={2}  // set `stroke-width`
-                strokeLinejoin="miter" // override other SVG props
-            /></Button>
-            <Button onPress={handleDelete} color="default"><IconTrash
-                size={18} // set custom `width` and `height`
-                color="black" // set `stroke` color
-                stroke={2}  // set `stroke-width`
-                strokeLinejoin="miter" // override other SVG props
-            /></Button>
+            <div className="flex flex-col gap-2 sm:flex-row w-full">
+                {/* 左ペイン */}
+                <div className="flex flex-col gap-1 w-[220px] shrink-0 border-r pr-2">
+                    <div className="flex gap-1">
+                        <Button onPress={handleReload} color="default"><IconRefresh
+                            size={18}
+                            color="black"
+                            stroke={2}
+                            strokeLinejoin="miter"
+                        /></Button>
+                        <Button onPress={() => setIsOpen(true)} color="default"><IconTablePlus
+                            size={18}
+                            color="black"
+                            stroke={2}
+                            strokeLinejoin="miter"
+                        /></Button>
+                        <Button onPress={handleDelete} color="default" isDisabled={!selectedContainer}><IconTrash
+                            size={18}
+                            color="black"
+                            stroke={2}
+                            strokeLinejoin="miter"
+                        /></Button>
+                    </div>
 
-            {loading && <p>Loading containers...</p>}
-            {error && <p>Error: {error}</p>}
+                    {loading && <p className="text-sm text-gray-500">Loading...</p>}
+                    {error && <p className="text-sm text-red-500">Error: {error}</p>}
 
-            <Listbox aria-label="Containers" selectionMode="single"
-                onSelectionChange={(keys) => {
-                    const selectedKey = Array.from(keys)[0];
-                    if (selectedKey) {
-                        handleAddContainer(containers.names[Number(selectedKey)]);
-                    }
-                }}>
+                    <Listbox
+                        aria-label="Containers"
+                        selectionMode="single"
+                        selectedKeys={selectedContainer !== null && containers?.names ? new Set([String(containers.names.indexOf(selectedContainer))]) : new Set()}
+                        onSelectionChange={(keys) => {
+                            const selectedKey = Array.from(keys)[0];
+                            if (selectedKey) {
+                                handleAddContainer(containers.names[Number(selectedKey)]);
+                            }
+                        }}
+                    >
                 {containers?.names?.length > 0 ? (
                     containers.names.map((name, index) => (
-                        <ListboxItem key={index} textValue={name}>
+                        <ListboxItem
+                            key={index}
+                            textValue={name}
+                            classNames={{
+                                base: "data-[selected=true]:bg-primary-50 data-[selected=true]:border-l-4 data-[selected=true]:border-primary data-[selected=true]:font-semibold rounded-none",
+                            }}
+                        >
                             {name}
                             <Chip size="sm">{containerDetails[name] ? containerDetails[name].container_type.substring(0, 3) : "?"}</Chip>
                         </ListboxItem>
@@ -182,30 +194,23 @@ export const Panel = ({ auth }: PanelProps) => {
                     <ListboxItem>No containers found</ListboxItem>
                 )}
             </Listbox>
+                </div>{/* 左ペイン end */}
 
-            {/* 選択されたコンテナの詳細を表示 
-            {selectedContainer && containerDetails[selectedContainer] && (
-                <div className="mt-6 border p-4 rounded">
-                    <h2>{containerDetails[selectedContainer].container_name}</h2>
-                    <p>Type: {containerDetails[selectedContainer].container_type}</p>
-                    <p>RowKey: {containerDetails[selectedContainer].rowkey ? "Yes" : "No"}</p>
-                    <h3>Columns:</h3>
-                    <ul>
-                        {containerDetails[selectedContainer].columns.map((col, idx) => (
-                            <li key={idx}>
-                                {col.name} ({col.type}) [Index: {col.index.join(", ")}]
-                            </li>
-                        ))}
-                    </ul>
+                {/* 右ペイン */}
+                <div className="flex-1 min-w-0">
+                    <RightPane
+                        client={client}
+                        ref={rightPaneRef}
+                        onActiveContainerChange={(name) => setSelectedContainer(name)}
+                    />
                 </div>
-            )}
-            */}
+            </div>{/* flex row end */}
 
             <Modal isOpen={isOpen} onOpenChange={setIsOpen}>
                 <ModalContent>
                     <ModalHeader>コンテナを追加</ModalHeader>
                     <ModalBody>
-                        {error && <p className="text-red-500">{error}</p>}
+                        {errorAdd && <p className="text-red-500">{errorAdd}</p>}
                         <Input
                             label="コンテナ名"
                             value={containerName}
@@ -231,7 +236,6 @@ export const Panel = ({ auth }: PanelProps) => {
                                     value={col.name}
                                     onChange={(e) => updateColumn(idx, "name", e.target.value)}
                                 />
-
                                 <Select
                                     label="Type"
                                     placeholder="Select type"
@@ -254,7 +258,6 @@ export const Panel = ({ auth }: PanelProps) => {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
-            <RightPane client={client} ref={rightPaneRef} />
         </>
     );
 };

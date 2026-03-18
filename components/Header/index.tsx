@@ -1,18 +1,45 @@
 "use client";
-import styles from "./header.module.scss";
 
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@heroui/button";
 
 export const Header = () => {
   const router = useRouter();
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const isDashboard = pathname === "/dashboard";
+
+  const connectionInfo = isDashboard && typeof window !== "undefined"
+    ? `${localStorage.getItem("user")}@${localStorage.getItem("clusterName")}.${localStorage.getItem("database")} on ${localStorage.getItem("host")}:${localStorage.getItem("port")}`
+    : null;
+
+  const handleDisconnect = () => {
+    ["host", "port", "clusterName", "user", "password", "database"].forEach(
+      (key) => localStorage.removeItem(key)
+    );
+    router.push("/");
+  };
 
   return (
-    <div className="headerArea">
-      <h1 className="headerText" onClick={() => router.push("/")}>
-        {pathname}
-      </h1>
+    <div className="flex items-center justify-between px-4 py-2 border-b bg-white dark:bg-zinc-900">
+      <span
+        className="font-semibold text-sm cursor-pointer text-gray-700 dark:text-zinc-200 hover:text-primary"
+        onClick={() => router.push("/")}
+      >
+        GridDB Adminyare
+      </span>
+
+      {isDashboard && (
+        <div className="flex items-center gap-3">
+          {connectionInfo && (
+            <span className="text-xs text-gray-500 dark:text-zinc-400 hidden sm:block">
+              {connectionInfo}
+            </span>
+          )}
+          <Button size="sm" color="danger" variant="flat" onPress={handleDisconnect}>
+            切断
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

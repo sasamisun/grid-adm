@@ -47,6 +47,16 @@ export const rows = (client: AxiosInstance, containerName: string, requestData: 
     return client.post(`/containers/${containerName}/rows`,requestData);
 };
 
+// ロウ登録/更新
+export const putRows = (client: AxiosInstance, containerName: string, rowData: any[][]) => {
+    return client.put(`/containers/${containerName}/rows`, rowData);
+};
+
+// ロウ削除
+export const deleteRows = (client: AxiosInstance, containerName: string, rowKeys: any[]) => {
+    return client.delete(`/containers/${containerName}/rows`, { data: rowKeys });
+};
+
 // useGriddb Hook
 export const useGriddb = <T>(
     axiosFunc: () => Promise<AxiosResponse<T>>,
@@ -66,7 +76,7 @@ export const useGriddb = <T>(
                 setData(res.data);
                 return res; 
             } catch (err: any) {
-                setError(err.message || "API Error");
+                setError(err.response?.data?.errorMessage || err.message || "API Error");
                 return null;
             } finally {
                 setLoading(false);

@@ -98,49 +98,43 @@ export const LoginForm = () => {
             <div className="flex flex-col gap-4 max-w-md">
                 <Input
                     label="Host"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="host"
-                    placeholder={DEFAULT_VAL.host}
                     value={host}
                     onChange={(e) => setHost(e.target.value)}
                 />
                 <Input
                     label="Port"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="port"
-                    placeholder={DEFAULT_VAL.port}
                     value={port}
                     onChange={(e) => setPort(e.target.value)}
                 />
                 <Input
                     label="ClusterName"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="cluster_name"
-                    placeholder={DEFAULT_VAL.clusterName}
                     value={clusterName}
                     onChange={(e) => setClusterName(e.target.value)}
                 />
                 <Input
                     label="User"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="user_name"
-                    placeholder={DEFAULT_VAL.user}
                     value={user}
                     onChange={(e) => setUser(e.target.value)}
                 />
                 <Input
                     label="Password"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="password"
-                    placeholder={DEFAULT_VAL.password}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                 />
                 <Input
                     label="Database"
-                    labelPlacement="outside"
+                    labelPlacement="inside"
                     name="database"
-                    placeholder={DEFAULT_VAL.database}
                     value={database}
                     onChange={(e) => setDatabase(e.target.value)}
                 />

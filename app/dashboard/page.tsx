@@ -29,9 +29,6 @@ export default function Dashboard() {
   }
   return (
     <div className="flex flex-col items-center gap-1 text-center sm:items-start sm:text-left">
-      <h1 className="max-w-max text-2xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-        {authInfo.user}@{authInfo.clusterName}.{authInfo.database} on {authInfo.host}:{authInfo.port}
-      </h1>
       <Panel auth={authInfo} />
     </div>
   );
