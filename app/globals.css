@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@plugin '../hero.ts';
+@source '../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --spacing: 0.15rem;
+
+
+
+}
+
+
+[aria-selected="true"] {
+    font-weight: bold;
+    color: #4c5968;
+    background-color:transparent;
+    
+}
+
+[data-slot="cursor"] {
+    background-color:transparent;
+    border: 1px solid #3344bb;
+}
+
+.close-maru:hover {
+    border-color: #333333;
+}
+.close-maru span:hover{
+    color: #333333;
+}
