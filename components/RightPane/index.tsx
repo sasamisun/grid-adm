@@ -198,6 +198,16 @@ const ContainerTab = ({ client, container }: { client: any; container: Container
         }
     };
 
+    const castValue = (value: string, type: string): any => {
+        if (value === "" || value === null) return null;
+        switch (type) {
+            case "INTEGER": case "LONG": case "SHORT": case "BYTE": return parseInt(value, 10);
+            case "FLOAT": case "DOUBLE": return parseFloat(value);
+            case "BOOL": return value === "true";
+            default: return value;
+        }
+    };
+
     const handleAddRow = () => {
         const emptyRow = container.columns.map(col => getDefaultValue(col.type));
         const newIdx = newRows.length;
@@ -224,16 +234,18 @@ const ContainerTab = ({ client, container }: { client: any; container: Container
     const handleCellConfirm = () => {
         if (!editingCell) return;
         const { rowIdx, colIdx, isNew } = editingCell;
+        const colType = container.columns[colIdx]?.type ?? "STRING";
+        const typedValue = castValue(editValue, colType);
         if (isNew) {
             setNewRows(prev => {
                 const updated = prev.map((r, i) => i === rowIdx ? [...r] : r);
-                updated[rowIdx][colIdx] = editValue;
+                updated[rowIdx][colIdx] = typedValue;
                 return updated;
             });
         } else {
             setEditedRows(prev => {
                 const base = prev[rowIdx] ? [...prev[rowIdx]] : [...data.rows[rowIdx]];
-                base[colIdx] = editValue;
+                base[colIdx] = typedValue;
                 return { ...prev, [rowIdx]: base };
             });
         }
@@ -256,8 +268,7 @@ const ContainerTab = ({ client, container }: { client: any; container: Container
             }
             if (deletedIndices.size > 0 && container.rowkey) {
                 const keys = Array.from(deletedIndices).map(idx => {
-                    const row = editedRows[idx] ?? data.rows[idx];
-                    return row[0]; // 先頭カラム = rowkey
+                    return data.rows[idx][0]; // 常に元データからrowkeyを取得（型保持のため）
                 });
                 const res = await deleteRows(client, container.container_name, keys);
                 if (res.status !== 204) throw new Error(`Delete failed: ${res.status}`);

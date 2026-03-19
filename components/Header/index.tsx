@@ -1,16 +1,28 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@heroui/button";
+
+const subscribeStorage = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+};
+
+const getConnectionInfo = () =>
+  `${localStorage.getItem("user")}@${localStorage.getItem("clusterName")}.${localStorage.getItem("database")} on ${localStorage.getItem("host")}:${localStorage.getItem("port")}`;
 
 export const Header = () => {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
 
-  const connectionInfo = isDashboard && typeof window !== "undefined"
-    ? `${localStorage.getItem("user")}@${localStorage.getItem("clusterName")}.${localStorage.getItem("database")} on ${localStorage.getItem("host")}:${localStorage.getItem("port")}`
-    : null;
+  // useSyncExternalStore: SSR時はnull、クライアントではlocalStorageから読み取る
+  const connectionInfo = useSyncExternalStore(
+    subscribeStorage,
+    getConnectionInfo,
+    () => null
+  );
 
   const handleDisconnect = () => {
     ["host", "port", "clusterName", "user", "password", "database"].forEach(

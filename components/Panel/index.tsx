@@ -110,6 +110,27 @@ export const Panel = ({ auth }: PanelProps) => {
     };
 
     const handleCreate = async () => {
+        // バリデーション
+        if (!containerName.trim()) {
+            setErrorAdd("コンテナ名を入力してください。");
+            return;
+        }
+        if (columns.length === 0) {
+            setErrorAdd("カラムを1件以上追加してください。");
+            return;
+        }
+        const emptyCol = columns.findIndex(col => !col.name.trim());
+        if (emptyCol !== -1) {
+            setErrorAdd(`カラム ${emptyCol + 1} の名前を入力してください。`);
+            return;
+        }
+        const names = columns.map(col => col.name.trim());
+        const duplicated = names.find((n, i) => names.indexOf(n) !== i);
+        if (duplicated) {
+            setErrorAdd(`カラム名「${duplicated}」が重複しています。`);
+            return;
+        }
+
         setLoadingAdd(true);
         setErrorAdd(null);
 
@@ -149,7 +170,14 @@ export const Panel = ({ auth }: PanelProps) => {
                             stroke={2}
                             strokeLinejoin="miter"
                         /></Button>
-                        <Button onPress={() => setIsOpen(true)} color="default"><IconTablePlus
+                        <Button onPress={() => {
+                            setContainerName("");
+                            setContainerType("COLLECTION");
+                            setRowKey(false);
+                            setColumns([{ name: "", type: "STRING", index: [] }]);
+                            setErrorAdd(null);
+                            setIsOpen(true);
+                        }} color="default"><IconTablePlus
                             size={18}
                             color="black"
                             stroke={2}
@@ -219,7 +247,15 @@ export const Panel = ({ auth }: PanelProps) => {
                         <Select
                             label="コンテナタイプ"
                             selectedKeys={[containerType]}
-                            onSelectionChange={(keys) => setContainerType(keys.currentKey as "COLLECTION" | "TIME_SERIES")}
+                            onSelectionChange={(keys) => {
+                                const selected = keys.currentKey as "COLLECTION" | "TIME_SERIES";
+                                setContainerType(selected);
+                                if (selected === "TIME_SERIES") {
+                                    setColumns(prev => prev.map((col, i) =>
+                                        i === 0 ? { ...col, type: "TIMESTAMP" } : col
+                                    ));
+                                }
+                            }}
                         >
                             <SelectItem key="COLLECTION">COLLECTION</SelectItem>
                             <SelectItem key="TIME_SERIES">TIME_SERIES</SelectItem>
@@ -230,9 +266,14 @@ export const Panel = ({ auth }: PanelProps) => {
 
                         <h3 className="mt-4">カラム情報</h3>
                         {columns.map((col, idx) => (
-                            <div key={idx} className="flex gap-2 mb-2">
+                            <div key={idx} className="flex gap-2 mb-2 items-center">
+                                {rowKey && idx === 0
+                                    ? <span title="RowKey" className="text-lg shrink-0">🔑</span>
+                                    : <span className="w-[22px] shrink-0" />
+                                }
                                 <Input
-                                    placeholder="カラム名"
+                                    label="カラム名"
+                                    labelPlacement="inside"
                                     value={col.name}
                                     onChange={(e) => updateColumn(idx, "name", e.target.value)}
                                 />
@@ -241,11 +282,20 @@ export const Panel = ({ auth }: PanelProps) => {
                                     placeholder="Select type"
                                     selectedKeys={[col.type]}
                                     onSelectionChange={(keys) => updateColumn(idx, "type", keys.anchorKey ?? "")}
+                                    isDisabled={containerType === "TIME_SERIES" && idx === 0}
                                 >
                                     {typeName.map((typeName) => (
                                         <SelectItem key={typeName.key}>{typeName.label}</SelectItem>
                                     ))}
                                 </Select>
+                                <Button
+                                    isIconOnly
+                                    size="sm"
+                                    variant="light"
+                                    color="danger"
+                                    isDisabled={columns.length <= 1 || (rowKey && idx === 0)}
+                                    onPress={() => setColumns(prev => prev.filter((_, i) => i !== idx))}
+                                >✕</Button>
                             </div>
                         ))}
                         <Button size="sm" onPress={addColumn}>カラム追加</Button>

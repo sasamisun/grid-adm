@@ -54,7 +54,7 @@ settings
 [gsadm]$ nano conf/gs_cluster.json
   #    "clusterName":"your_clustername" #<-- input your_clustername
 [gsadm]$ gs_startnode
-[gsadm]$ gs_joincluster -c sasa_cluster -u admin/admin
+[gsadm]$ gs_joincluster -c sasaCluster -u admin/admin
 ```
 run webapi(https://github.com/griddb/webapi)
 export GS_WEBAPI_HOME=/var/lib/gridstore/webapi
