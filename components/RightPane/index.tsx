@@ -8,6 +8,7 @@ import { Chip } from "@heroui/chip";
 import type { Container } from "../types";
 import { createHttpClient, rows, putRows, deleteRows, useGriddb } from "@/hooks/useGriddbAccess";
 import type { RowRequest } from "../types";
+import { SqlEditor } from "@/components/SqlEditor";
 
 type TabItem = {
     id: string;
@@ -25,9 +26,10 @@ export type RightPaneHandle = {
 type RightPaneProps = {
     client: ReturnType<typeof createHttpClient>;
     onActiveContainerChange?: (name: string | null) => void;
+    containerNames?: string[];
 };
 
-const RightPane = forwardRef<RightPaneHandle, RightPaneProps>(({ client, onActiveContainerChange }, ref) => {
+const RightPane = forwardRef<RightPaneHandle, RightPaneProps>(({ client, onActiveContainerChange, containerNames = [] }, ref) => {
     const [tabs, setTabs] = useState<TabItem[]>([]);
     const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
@@ -131,11 +133,7 @@ const RightPane = forwardRef<RightPaneHandle, RightPaneProps>(({ client, onActiv
                             <ContainerTab client={client} container={tab.data} />
                         )}
                         {tab.type === "sql" && (
-                            <div>
-                                <h2>SQL Editor</h2>
-                                <textarea className="w-full h-40 border p-2" placeholder="Enter SQL query here..." />
-                                <Button color="primary" className="mt-2">実行</Button>
-                            </div>
+                            <SqlEditor containerNames={containerNames} />
                         )}
                     </Tab>
                 ))}

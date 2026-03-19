@@ -3,6 +3,8 @@
 import { useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@heroui/button";
+import { useTheme } from "next-themes";
+import { IconSun, IconMoon } from "@tabler/icons-react";
 
 const subscribeStorage = (callback: () => void) => {
   window.addEventListener("storage", callback);
@@ -16,6 +18,7 @@ export const Header = () => {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
+  const { theme, setTheme } = useTheme();
 
   // useSyncExternalStore: SSR時はnull、クライアントではlocalStorageから読み取る
   const connectionInfo = useSyncExternalStore(
@@ -40,18 +43,27 @@ export const Header = () => {
         GridDB Adminyare
       </span>
 
-      {isDashboard && (
-        <div className="flex items-center gap-3">
-          {connectionInfo && (
-            <span className="text-xs text-gray-500 dark:text-zinc-400 hidden sm:block">
-              {connectionInfo}
-            </span>
-          )}
+      <div className="flex items-center gap-3">
+        {isDashboard && connectionInfo && (
+          <span className="text-xs text-gray-500 dark:text-zinc-400 hidden sm:block">
+            {connectionInfo}
+          </span>
+        )}
+        {isDashboard && (
           <Button size="sm" color="danger" variant="flat" onPress={handleDisconnect}>
             切断
           </Button>
-        </div>
-      )}
+        )}
+        <Button
+          isIconOnly
+          size="sm"
+          variant="light"
+          onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label="テーマ切り替え"
+        >
+          {theme === "dark" ? <IconSun size={16} /> : <IconMoon size={16} />}
+        </Button>
+      </div>
     </div>
   );
 };

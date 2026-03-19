@@ -230,6 +230,7 @@ export const Panel = ({ auth }: PanelProps) => {
                         client={client}
                         ref={rightPaneRef}
                         onActiveContainerChange={(name) => setSelectedContainer(name)}
+                        containerNames={containers?.names ?? []}
                     />
                 </div>
             </div>{/* flex row end */}
