@@ -57,6 +57,26 @@ export const deleteRows = (client: AxiosInstance, containerName: string, rowKeys
     return client.delete(`/containers/${containerName}/rows`, { data: rowKeys });
 };
 
+// SQL SELECT実行
+export const executeSqlSelect = (client: AxiosInstance, stmt: string) => {
+    return client.post(`/sql/dml/query`, [{ stmt }]);
+};
+
+// SQL UPDATE/INSERT/DELETE/REPLACE実行
+export const executeSqlUpdate = (client: AxiosInstance, stmt: string) => {
+    return client.post(`/sql/dml/update`, [{ stmt }]);
+};
+
+// SQL DDL実行 (CREATE/DROP/ALTER)
+export const executeSqlDdl = (client: AxiosInstance, stmt: string) => {
+    return client.post(`/sql/ddl`, [{ stmt }]);
+};
+
+// SQL DCL実行 (GRANT/REVOKE/SET PASSWORD)
+export const executeSqlDcl = (client: AxiosInstance, stmt: string) => {
+    return client.post(`/sql/dcl`, [{ stmt }]);
+};
+
 // useGriddb Hook
 export const useGriddb = <T>(
     axiosFunc: () => Promise<AxiosResponse<T>>,

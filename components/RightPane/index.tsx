@@ -134,6 +134,7 @@ const RightPane = forwardRef<RightPaneHandle, RightPaneProps>(({ client, onActiv
                         )}
                         {tab.type === "sql" && (
                             <SqlEditor
+                                client={client}
                                 containerNames={containerNames}
                                 onTitleChange={(title) =>
                                     setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, title } : t))

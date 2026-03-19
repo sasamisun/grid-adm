@@ -3,21 +3,32 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { sql } from "@codemirror/lang-sql";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
-import { keymap } from "@codemirror/view";
+import { keymap, EditorView } from "@codemirror/view";
 import { useTheme } from "next-themes";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Pagination } from "@heroui/pagination";
 import { Input } from "@heroui/input";
 import { IconHistory, IconBookmark, IconDeviceFloppy, IconTrash, IconPlayerPlay } from "@tabler/icons-react";
+import { createHttpClient, executeSqlSelect, executeSqlUpdate, executeSqlDdl, executeSqlDcl } from "@/hooks/useGriddbAccess";
 
 const PAGE_SIZE = 50;
 
-type QueryResult = {
+type SelectResult = {
+    kind: "select";
     columns: string[];
     rows: any[][];
 };
+
+type NonSelectResult = {
+    kind: "update" | "ddl" | "dcl";
+    status: number;
+    updatedRows?: number;
+    message?: string | null;
+};
+
+type QueryResult = SelectResult | NonSelectResult;
 
 type HistoryEntry = {
     id: string;
@@ -35,13 +46,23 @@ type SavedEntry = {
 };
 
 type SqlEditorProps = {
+    client: ReturnType<typeof createHttpClient>;
     containerNames?: string[];
     onTitleChange?: (title: string) => void;
 };
 
-export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps) => {
+const detectSqlType = (stmt: string): "select" | "update" | "ddl" | "dcl" => {
+    const first = stmt.trim().split(/\s+/)[0].toUpperCase();
+    if (first === "SELECT") return "select";
+    if (["UPDATE", "INSERT", "DELETE", "REPLACE"].includes(first)) return "update";
+    if (["CREATE", "DROP", "ALTER"].includes(first)) return "ddl";
+    return "dcl";
+};
+
+export const SqlEditor = ({ client, containerNames = [], onTitleChange }: SqlEditorProps) => {
     const { theme } = useTheme();
     const [query, setQuery] = useState("");
+    const editorRef = useRef<EditorView | null>(null);
 
     // 結果表示用
     const [result, setResult] = useState<QueryResult | null>(null);
@@ -61,28 +82,80 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
     const [saveName, setSaveName] = useState("");
 
     const pagedRows = useMemo(() => {
-        if (!result) return [];
+        if (!result || result.kind !== "select") return [];
         const start = (page - 1) * PAGE_SIZE;
         return result.rows.slice(start, start + PAGE_SIZE);
     }, [result, page]);
 
-    const totalPages = result ? Math.max(1, Math.ceil(result.rows.length / PAGE_SIZE)) : 1;
+    const totalPages = (result?.kind === "select")
+        ? Math.max(1, Math.ceil(result.rows.length / PAGE_SIZE))
+        : 1;
+
+    const getQueryToExecute = (): string => {
+        if (editorRef.current) {
+            const { state } = editorRef.current;
+            const sel = state.selection.main;
+            if (!sel.empty) {
+                const selected = state.sliceDoc(sel.from, sel.to).trim();
+                if (selected) return selected;
+            }
+        }
+        return query.trim();
+    };
 
     const handleExecute = useCallback(async () => {
-        if (!query.trim()) return;
+        const queryToRun = getQueryToExecute();
+        if (!queryToRun) return;
         setExecuting(true);
         setResultError(null);
         setResult(null);
         setPage(1);
         const start = Date.now();
         try {
-            // Phase 2 で API 呼び出しに置き換え
-            console.log("Execute:", query);
+            const sqlType = detectSqlType(queryToRun);
+            let newResult: QueryResult;
+
+            if (sqlType === "select") {
+                const res = await executeSqlSelect(client, queryToRun);
+                const data = res.data[0];
+                newResult = {
+                    kind: "select",
+                    columns: data.columns.map((c: any) => c.name),
+                    rows: data.results,
+                };
+            } else if (sqlType === "update") {
+                const res = await executeSqlUpdate(client, queryToRun);
+                const data = res.data[0];
+                newResult = {
+                    kind: "update",
+                    status: data.status,
+                    updatedRows: data.updatedRows,
+                    message: data.message,
+                };
+            } else if (sqlType === "ddl") {
+                const res = await executeSqlDdl(client, queryToRun);
+                const data = res.data[0];
+                newResult = {
+                    kind: "ddl",
+                    status: data.status,
+                    message: data.message,
+                };
+            } else {
+                const res = await executeSqlDcl(client, queryToRun);
+                const data = res.data[0];
+                newResult = {
+                    kind: "dcl",
+                    status: data.status,
+                    message: data.message,
+                };
+            }
+
             const elapsed = Date.now() - start;
+            setResult(newResult);
             setExecTime(elapsed);
             setHistory(prev => [{
                 id: crypto.randomUUID(),
-                query: query.trim(),
+                query: queryToRun,
                 executedAt: new Date(),
                 execTime: elapsed,
             }, ...prev]);
@@ -93,7 +166,7 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
             setExecTime(elapsed);
             setHistory(prev => [{
                 id: crypto.randomUUID(),
-                query: query.trim(),
+                query: queryToRun,
                 executedAt: new Date(),
                 execTime: elapsed,
                 error: msg,
@@ -101,7 +174,7 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
         } finally {
             setExecuting(false);
         }
-    }, [query]);
+    }, [query, client]);
 
     const handleClear = () => {
         setQuery("");
@@ -127,13 +200,21 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
         setSaved(prev => prev.filter(e => e.id !== id));
     };
 
-    const executeKeymap = keymap.of([
+    const executeKeymap = useMemo(() => keymap.of([
         {
             key: "Ctrl-Enter",
             mac: "Cmd-Enter",
             run: () => { handleExecute(); return true; },
         },
-    ]);
+    ]), [handleExecute]);
+
+    const extensions = useMemo(() => [
+        sql({
+            upperCaseKeywords: true,
+            schema: Object.fromEntries(containerNames.map(name => [name, []]))
+        }),
+        executeKeymap,
+    ], [containerNames, executeKeymap]);
 
     const togglePanel = (panel: "history" | "saved") => {
         setSidePanel(prev => prev === panel ? null : panel);
@@ -181,13 +262,8 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
                 <CodeMirror
                     value={query}
                     onChange={setQuery}
-                    extensions={[
-                        sql({
-                            upperCaseKeywords: true,
-                            schema: Object.fromEntries(containerNames.map(name => [name, []]))
-                        }),
-                        executeKeymap,
-                    ]}
+                    onCreateEditor={(view) => { editorRef.current = view; }}
+                    extensions={extensions}
                     theme={theme === "dark" ? vscodeDark : "light"}
                     basicSetup={{
                         lineNumbers: true,
@@ -216,12 +292,12 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
                 <div className="flex flex-col gap-1 mt-1">
                     {(result || resultError || execTime !== null) && (
                         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-zinc-400">
-                            {result && <span>{result.rows.length} 件</span>}
+                            {result?.kind === "select" && <span>{result.rows.length} 件</span>}
                             {execTime !== null && <span>{(execTime / 1000).toFixed(2)} 秒</span>}
                             {resultError && <span className="text-red-500">{resultError}</span>}
                         </div>
                     )}
-                    {result && result.rows.length > 0 && (
+                    {result?.kind === "select" && result.rows.length > 0 && (
                         <>
                             <div className="overflow-x-auto border rounded">
                                 <table className="w-full text-sm border-collapse">
@@ -256,8 +332,20 @@ export const SqlEditor = ({ containerNames = [], onTitleChange }: SqlEditorProps
                             )}
                         </>
                     )}
-                    {result && result.rows.length === 0 && (
+                    {result?.kind === "select" && result.rows.length === 0 && (
                         <p className="text-sm text-gray-400 mt-1">結果が0件でした。</p>
+                    )}
+                    {result?.kind === "update" && (
+                        result.status === 0
+                            ? <p className="text-sm text-red-500 mt-1">{result.message ?? "実行に失敗しました。"}</p>
+                            : <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                                {result.updatedRows !== undefined ? `${result.updatedRows} 件更新しました。` : "完了しました。"}
+                              </p>
+                    )}
+                    {(result?.kind === "ddl" || result?.kind === "dcl") && (
+                        result.status === 0
+                            ? <p className="text-sm text-red-500 mt-1">{result.message ?? "実行に失敗しました。"}</p>
+                            : <p className="text-sm text-green-600 dark:text-green-400 mt-1">完了しました。</p>
                     )}
                 </div>
             </div>
