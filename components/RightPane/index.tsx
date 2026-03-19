@@ -95,7 +95,7 @@ const RightPane = forwardRef<RightPaneHandle, RightPaneProps>(({ client, onActiv
         if (!wrapper) return;
         const handleWheel = (e: WheelEvent) => {
             const tabList = wrapper.querySelector('[role="tablist"]');
-            if (tabList && e.deltaY !== 0) {
+            if (tabList && tabList.contains(e.target as Node) && e.deltaY !== 0) {
                 e.preventDefault();
                 tabList.scrollLeft += e.deltaY;
             }
