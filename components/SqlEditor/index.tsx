@@ -95,6 +95,25 @@ export const SqlEditor = ({ client, containerNames = [], onTitleChange }: SqlEdi
     const { theme } = useTheme();
     const [query, setQuery] = useState("");
     const editorRef = useRef<EditorView | null>(null);
+    const [editorHeight, setEditorHeight] = useState(240);
+    const isDragging = useRef(false);
+    const dragStartY = useRef(0);
+    const dragStartHeight = useRef(0);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging.current) return;
+            const delta = e.clientY - dragStartY.current;
+            setEditorHeight(Math.max(80, Math.min(800, dragStartHeight.current + delta)));
+        };
+        const handleMouseUp = () => { isDragging.current = false; };
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, []);
 
     // 結果表示用
     const [result, setResult] = useState<SingleResult | null>(null);
@@ -401,7 +420,18 @@ export const SqlEditor = ({ client, containerNames = [], onTitleChange }: SqlEdi
                         searchKeymap: false,
                     }}
                     className="border rounded text-sm"
-                    height="240px"
+                    height={`${editorHeight}px`}
+                />
+
+                {/* リサイズハンドル */}
+                <div
+                    className="h-1.5 cursor-row-resize rounded bg-gray-200 hover:bg-blue-400 dark:bg-zinc-700 dark:hover:bg-blue-500 transition-colors"
+                    onMouseDown={(e) => {
+                        isDragging.current = true;
+                        dragStartY.current = e.clientY;
+                        dragStartHeight.current = editorHeight;
+                        e.preventDefault();
+                    }}
                 />
 
                 {/* 結果エリア */}
